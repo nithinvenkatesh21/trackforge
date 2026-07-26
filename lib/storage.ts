@@ -10,13 +10,21 @@ const accessKeyId = process.env.R2_ACCESS_KEY_ID || "";
 const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY || "";
 export const bucketName = process.env.R2_BUCKET_NAME || "trackforge-storage";
 
+// Support both Cloudflare R2 and Supabase S3 storage endpoints
+const endpoint = process.env.S3_ENDPOINT
+  ? process.env.S3_ENDPOINT
+  : accountId
+  ? `https://${accountId}.r2.cloudflarestorage.com`
+  : "https://localhost.localstack.cloud";
+
 export const r2Client = new S3Client({
-  region: "auto",
-  endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+  region: process.env.S3_REGION || "auto",
+  endpoint,
   credentials: {
     accessKeyId,
     secretAccessKey,
   },
+  forcePathStyle: Boolean(process.env.S3_ENDPOINT), // Required for Supabase S3 compatibility
 });
 
 export async function getUploadUrl(key: string, contentType: string, expiresInSeconds = 3600) {
@@ -31,7 +39,7 @@ export async function getUploadUrl(key: string, contentType: string, expiresInSe
 
 export async function getDownloadUrl(key: string, expiresInSeconds = 3600) {
   if (!key) return null;
-  
+
   // If it's already a full HTTP URL (e.g. sample avatar or local placeholder), return as is
   if (key.startsWith("http://") || key.startsWith("https://")) {
     return key;
