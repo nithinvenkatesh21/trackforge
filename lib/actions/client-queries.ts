@@ -20,15 +20,18 @@ export async function fetchUserData(userId: string) {
 }
 
 export async function fetchMarketplaceAssets(type?: string, search?: string) {
-  return await getMarketplaceAssets(type, search);
+  return await getMarketplaceAssets({
+    type: type as any,
+    search: search,
+  });
 }
 
 export async function fetchMarketplaceAssetById(assetId: string) {
   return await getMarketplaceAssetById(assetId);
 }
 
-export async function fetchOpenServiceRequests(type?: string) {
-  return await getOpenServiceRequests(type);
+export async function fetchOpenServiceRequests() {
+  return await getOpenServiceRequests();
 }
 
 export async function fetchServiceRequestById(requestId: string) {

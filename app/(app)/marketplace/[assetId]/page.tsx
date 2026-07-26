@@ -45,7 +45,7 @@ export default function AssetDetailPage() {
     try {
       await purchaseAsset(assetId);
       toast.success("Asset purchased successfully!");
-      const updated = await getMarketplaceAssetById(assetId);
+      const updated = await fetchMarketplaceAssetById(assetId);
       setAsset(updated);
     } catch (err: any) {
       toast.error(err.message || "Failed to purchase asset");
@@ -64,7 +64,7 @@ export default function AssetDetailPage() {
       });
       toast.success("Review posted!");
       setReviewComment("");
-      const updated = await getMarketplaceAssetById(assetId);
+      const updated = await fetchMarketplaceAssetById(assetId);
       setAsset(updated);
     } catch (err: any) {
       toast.error(err.message || "Failed to submit review");
