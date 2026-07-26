@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { GitBranch, Sparkles, AudioWaveform, ShieldCheck, ShoppingBag, ArrowRight } from "lucide-react";
