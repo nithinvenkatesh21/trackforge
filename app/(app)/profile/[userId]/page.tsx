@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { getUserById } from "@/lib/queries/users";
-import { getCurrentUser } from "@/lib/auth";
+import { getSelfUser } from "@/lib/actions/get-self";
 import { getBalance } from "@/lib/queries/credits";
 import { getUserRatings } from "@/lib/queries/ratings";
 import { updateProfile } from "@/lib/actions/users";
@@ -42,7 +42,7 @@ export default function ProfilePage() {
         setGenres(u.genres ? u.genres.join(", ") : "");
       }
 
-      const me = await getCurrentUser();
+      const me = await getSelfUser();
       setCurrentUser(me);
 
       const bal = await getBalance(targetUserId);
