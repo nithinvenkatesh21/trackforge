@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getProjectById } from "@/lib/queries/projects";
+import { fetchProjectById } from "@/lib/actions/client-queries";
 import { updateProject, deleteProject } from "@/lib/actions/projects";
 import { Settings, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -23,7 +23,7 @@ export default function SettingsTabPage() {
   });
 
   useEffect(() => {
-    getProjectById(projectId).then((p) => {
+    fetchProjectById(projectId).then((p) => {
       if (p) {
         setProject(p);
         setFormData({

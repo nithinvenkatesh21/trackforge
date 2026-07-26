@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { getProjectCollaborators } from "@/lib/queries/collaborators";
-import { searchUsers } from "@/lib/queries/users";
+import { fetchProjectCollaborators, fetchSearchUsers } from "@/lib/actions/client-queries";
 import { sendInvite, removeCollaborator } from "@/lib/actions/collaborators";
 import { Users, UserPlus, Search, Shield, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
@@ -22,7 +21,7 @@ export default function CollaboratorsTabPage() {
 
   const loadCollaborators = async () => {
     try {
-      const data = await getProjectCollaborators(projectId);
+      const data = await fetchProjectCollaborators(projectId);
       setCollaborators(data);
     } catch (err) {
       console.error(err);
@@ -35,7 +34,7 @@ export default function CollaboratorsTabPage() {
 
   useEffect(() => {
     if (searchQuery.trim().length >= 2) {
-      searchUsers(searchQuery).then(setSearchResults);
+      fetchSearchUsers(searchQuery).then(setSearchResults);
     } else {
       setSearchResults([]);
     }

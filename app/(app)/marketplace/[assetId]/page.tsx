@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getMarketplaceAssetById } from "@/lib/queries/marketplace";
+import { fetchMarketplaceAssetById } from "@/lib/actions/client-queries";
 import { purchaseAsset, createAssetReview } from "@/lib/actions/marketplace";
 import { ShoppingBag, Star, Download, Play, Pause, ArrowLeft, Check, Lock } from "lucide-react";
 import { toast } from "sonner";
@@ -20,7 +20,7 @@ export default function AssetDetailPage() {
   const [isPurchasing, setIsPurchasing] = useState(false);
 
   useEffect(() => {
-    getMarketplaceAssetById(assetId).then((data) => {
+    fetchMarketplaceAssetById(assetId).then((data) => {
       setAsset(data);
       if (data?.previewUrl) {
         setAudioObj(new Audio(data.previewUrl));

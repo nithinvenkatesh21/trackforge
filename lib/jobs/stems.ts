@@ -4,9 +4,8 @@ import { projectFiles, versions, notifications } from "@/lib/db/schema";
 import { formatStemFileName } from "@/lib/utils/stem-naming";
 import { eq } from "drizzle-orm";
 
-export const separateStemsJob = (inngest.createFunction as any)(
-  { id: "separate-stems" },
-  { event: "stems/requested" },
+export const separateStemsJob = inngest.createFunction(
+  { id: "separate-stems", triggers: [{ event: "stems/requested" }] },
   async ({ event, step }: { event: any; step: any }) => {
     const { versionId, userId, namingPattern } = event.data;
 

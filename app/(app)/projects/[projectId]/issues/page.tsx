@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { getIssuesByProject } from "@/lib/queries/issues";
+import { fetchIssuesByProject } from "@/lib/actions/client-queries";
 import { createIssue, createIssueReply, updateIssueStatus } from "@/lib/actions/issues";
 import { AlertCircle, Plus, MessageSquare, CheckCircle, Clock, X, Tag } from "lucide-react";
 import { toast } from "sonner";
@@ -21,7 +21,7 @@ export default function IssuesTabPage() {
 
   const loadIssues = async () => {
     try {
-      const data = await getIssuesByProject(projectId);
+      const data = await fetchIssuesByProject(projectId);
       setIssuesList(data);
     } catch (err) {
       console.error(err);

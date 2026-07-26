@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { listPublicProjects } from "@/lib/queries/projects";
+import { fetchPublicProjects } from "@/lib/actions/get-public-projects";
 import { Compass, Music, Users, Search, FolderGit2 } from "lucide-react";
 
 export default function ExplorePage() {
@@ -12,7 +12,7 @@ export default function ExplorePage() {
 
   const loadProjects = async () => {
     try {
-      const data = await listPublicProjects(
+      const data = await fetchPublicProjects(
         genreFilter || undefined,
         neededRoleFilter || undefined
       );

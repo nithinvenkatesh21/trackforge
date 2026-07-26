@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { getMarketplaceAssets } from "@/lib/queries/marketplace";
+import { fetchMarketplaceAssets } from "@/lib/actions/client-queries";
 import { ShoppingBag, Search, Plus, Star, Download, Sparkles } from "lucide-react";
 
 export default function MarketplacePage() {
@@ -13,10 +13,11 @@ export default function MarketplacePage() {
 
   const loadAssets = async () => {
     try {
-      const data = await getMarketplaceAssets({
-        search: search.trim() || undefined,
-        type: selectedType || undefined,
-      });
+      setLoading(true);
+      const data = await fetchMarketplaceAssets(
+        selectedType || undefined,
+        search || undefined
+      );
       setAssets(data);
     } catch (err) {
       console.error(err);

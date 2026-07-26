@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getServiceRequestById } from "@/lib/queries/service-requests";
+import { fetchServiceRequestById } from "@/lib/actions/client-queries";
 import {
   applyToServiceRequest,
   acceptServiceApplication,
@@ -23,7 +23,7 @@ export default function ServiceRequestDetailPage() {
 
   const loadRequest = async () => {
     try {
-      const data = await getServiceRequestById(requestId);
+      const data = await fetchServiceRequestById(requestId);
       setRequest(data);
     } catch (err) {
       console.error(err);

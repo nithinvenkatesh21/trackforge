@@ -5,9 +5,8 @@ import { eq } from "drizzle-orm";
 
 export const inngest = new Inngest({ id: "trackforge" });
 
-export const generateWaveformJob = (inngest.createFunction as any)(
-  { id: "generate-waveform" },
-  { event: "audio/waveform.requested" },
+export const generateWaveformJob = inngest.createFunction(
+  { id: "generate-waveform", triggers: [{ event: "audio/waveform.requested" }] },
   async ({ event, step }: { event: any; step: any }) => {
     const { versionId } = event.data;
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { getVersionsByProject } from "@/lib/queries/versions";
+import { fetchVersionsByProject } from "@/lib/actions/client-queries";
 import { createVersion, forkVersion } from "@/lib/actions/versions";
 import { VersionTreeView } from "@/components/project/VersionTreeView";
 import { AudioPlayerWithComments } from "@/components/project/AudioPlayerWithComments";
@@ -32,7 +32,7 @@ export default function VersionsTabPage() {
 
   const loadVersions = async () => {
     try {
-      const data = await getVersionsByProject(projectId);
+      const data = await fetchVersionsByProject(projectId);
       setVersions(data);
       if (data.length > 0 && !selectedVersion) {
         setSelectedVersion(data[0]);

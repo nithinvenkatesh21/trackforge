@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { getOpenServiceRequests } from "@/lib/queries/service-requests";
+import { fetchOpenServiceRequests } from "@/lib/actions/client-queries";
 import { createServiceRequest } from "@/lib/actions/service-requests";
 import { Briefcase, Plus, Clock, Coins, X } from "lucide-react";
 import { toast } from "sonner";
@@ -18,7 +18,7 @@ export default function ServiceRequestsPage() {
 
   const loadRequests = async () => {
     try {
-      const data = await getOpenServiceRequests();
+      const data = await fetchOpenServiceRequests();
       setRequests(data);
     } catch (err) {
       console.error(err);

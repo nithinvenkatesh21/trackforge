@@ -2,10 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { getUserById } from "@/lib/queries/users";
+import { fetchUserData } from "@/lib/actions/client-queries";
 import { getSelfUser } from "@/lib/actions/get-self";
-import { getBalance } from "@/lib/queries/credits";
-import { getUserRatings } from "@/lib/queries/ratings";
 import { updateProfile } from "@/lib/actions/users";
 import { adminAddCredits } from "@/lib/actions/credits";
 import { User, Star, Coins, Music, Edit3, Save, X, Plus } from "lucide-react";
@@ -33,7 +31,7 @@ export default function ProfilePage() {
 
   const loadData = async () => {
     try {
-      const u = await getUserById(targetUserId);
+      const { user: u, balance, ratings: rList } = await fetchUserData(targetUserId);
       setProfileUser(u);
       if (u) {
         setName(u.name || "");
@@ -44,11 +42,7 @@ export default function ProfilePage() {
 
       const me = await getSelfUser();
       setCurrentUser(me);
-
-      const bal = await getBalance(targetUserId);
-      setCreditBalance(bal.balance);
-
-      const rList = await getUserRatings(targetUserId);
+      setCreditBalance(balance);
       setRatings(rList);
     } catch (err) {
       console.error(err);
