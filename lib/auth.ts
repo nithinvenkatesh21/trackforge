@@ -1,5 +1,5 @@
 import { auth, currentUser as clerkCurrentUser } from "@clerk/nextjs/server";
-import { db } from "@/lib/db";
+import { db, resetPostgresClient } from "@/lib/db";
 import { users, userCredits } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
@@ -149,6 +149,7 @@ export async function getCurrentUser() {
 
     return user || fallbackUser;
   } catch (dbError: any) {
+    resetPostgresClient();
     if (dbError?.digest === "DYNAMIC_SERVER_USAGE" || dbError?.message?.includes("DYNAMIC_SERVER_USAGE")) {
       throw dbError;
     }
@@ -224,6 +225,7 @@ export async function requireUser() {
       };
     }
   } catch (err: any) {
+    resetPostgresClient();
     console.error("requireUser DB provisioning error:", err);
     throw new Error(`Database user sync error: ${err?.message || err}`);
   }

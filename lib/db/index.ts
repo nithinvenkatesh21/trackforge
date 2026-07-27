@@ -28,17 +28,37 @@ declare global {
   var _postgresClient: ReturnType<typeof postgres> | undefined;
 }
 
-const client =
-  globalThis._postgresClient ||
-  postgres(connectionString, {
-    prepare: false,
-    max: process.env.NODE_ENV === "production" ? 1 : 10,
-    idle_timeout: 20,
-    connect_timeout: 10,
-    ssl: isRemote ? { rejectUnauthorized: false } : false,
-  });
+export function getPostgresClient() {
+  if (!globalThis._postgresClient) {
+    globalThis._postgresClient = postgres(connectionString, {
+      prepare: false,
+      max: process.env.NODE_ENV === "production" ? 1 : 10,
+      idle_timeout: 20,
+      connect_timeout: 10,
+      ssl: isRemote ? { rejectUnauthorized: false } : false,
+    });
+  }
+  return globalThis._postgresClient;
+}
 
-globalThis._postgresClient = client;
+export function resetPostgresClient() {
+  if (globalThis._postgresClient) {
+    try {
+      globalThis._postgresClient.end();
+    } catch {}
+    globalThis._postgresClient = undefined;
+  }
+}
 
-export const db = drizzle(client, { schema });
+export const db = drizzle(
+  new Proxy({} as any, {
+    get(_, prop: any) {
+      const client = getPostgresClient() as any;
+      const value = client[prop];
+      return typeof value === "function" ? value.bind(client) : value;
+    },
+  }),
+  { schema }
+);
+
 
