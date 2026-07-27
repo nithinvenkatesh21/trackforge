@@ -11,9 +11,17 @@ let rawConnectionString =
   process.env.SUPABASE_DATABASE_URL ||
   DEFAULT_SUPABASE_URL;
 
-// Automatically use Supabase IPv4-compatible transaction pooler port 6543 for serverless environments (Vercel)
-if (rawConnectionString.includes("supabase.co:5432")) {
-  rawConnectionString = rawConnectionString.replace(":5432", ":6543");
+// Ensure Supabase connection uses IPv4-compatible transaction pooler port 6543 on Vercel
+try {
+  const url = new URL(rawConnectionString);
+  if (url.hostname.includes("supabase.co") && (!url.port || url.port === "5432")) {
+    url.port = "6543";
+    rawConnectionString = url.toString();
+  }
+} catch (e) {
+  if (rawConnectionString.includes("supabase.co:5432")) {
+    rawConnectionString = rawConnectionString.replace(":5432", ":6543");
+  }
 }
 
 const connectionString = rawConnectionString;
@@ -32,8 +40,8 @@ export function getPostgresClient() {
   if (!globalThis._postgresClient) {
     globalThis._postgresClient = postgres(connectionString, {
       prepare: false,
-      max: process.env.NODE_ENV === "production" ? 1 : 10,
-      idle_timeout: 20,
+      max: 5,
+      idle_timeout: 30,
       connect_timeout: 10,
       ssl: isRemote ? { rejectUnauthorized: false } : false,
     });
