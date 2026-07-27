@@ -7,6 +7,9 @@ import { NotificationsDropdown } from "@/components/project/NotificationsDropdow
 import { UserButton } from "@clerk/nextjs";
 import { LayoutDashboard, Compass, ShoppingBag, Briefcase, GitPullRequest, Coins, User } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function AppLayout({
   children,
 }: {
@@ -83,22 +86,27 @@ export default async function AppLayout({
             />
           )}
 
-          {/* Profile & User Button */}
+          {/* Profile & User Badge */}
           {user ? (
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-3 bg-zinc-900/80 border border-zinc-800/80 rounded-xl px-3 py-1.5">
               <Link
                 href={`/profile/${user.id}`}
-                className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white transition cursor-pointer"
-                title="My Profile"
+                className="flex items-center space-x-2 hover:opacity-80 transition cursor-pointer"
+                title="View Profile"
               >
-                <User className="w-4 h-4" />
+                <div className="w-6 h-6 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 flex items-center justify-center text-xs font-bold">
+                  {user.name ? user.name[0].toUpperCase() : "C"}
+                </div>
+                <span className="text-xs font-bold text-white truncate max-w-[120px]">
+                  {user.name || "Creator"}
+                </span>
               </Link>
-              <UserButton />
+              <UserButton showName={false} />
             </div>
           ) : (
             <Link
               href="/auth/sign-in"
-              className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold text-xs transition"
+              className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold text-xs transition shadow-md shadow-emerald-500/20"
             >
               Sign In
             </Link>
