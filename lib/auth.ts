@@ -1,4 +1,3 @@
-import { auth, currentUser as clerkCurrentUser } from "@clerk/nextjs/server";
 import { db, resetPostgresClient } from "@/lib/db";
 import { users, userCredits } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -10,8 +9,9 @@ export async function getCurrentUser() {
 
   if (!clerkId) {
     try {
+      const { auth } = await import("@clerk/nextjs/server");
       const authData = await auth();
-      clerkId = authData.userId;
+      clerkId = authData?.userId || null;
     } catch (error: any) {
       if (error?.digest === "DYNAMIC_SERVER_USAGE" || error?.message?.includes("DYNAMIC_SERVER_USAGE")) {
         throw error;
@@ -78,6 +78,7 @@ export async function getCurrentUser() {
         let imageUrl: string | null = null;
 
         try {
+          const { currentUser: clerkCurrentUser } = await import("@clerk/nextjs/server");
           const clerkUser = await clerkCurrentUser();
           if (clerkUser) {
             primaryEmail =
