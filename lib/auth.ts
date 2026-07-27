@@ -1,4 +1,4 @@
-import { db, resetPostgresClient } from "@/lib/db";
+import { db, resetPostgresClient, withDbRetry } from "@/lib/db";
 import { users, userCredits } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
@@ -46,111 +46,113 @@ export async function getCurrentUser() {
   };
 
   try {
-    // Select specific essential fields to prevent column mismatch failures
-    let [user] = await db
-      .select({
-        id: users.id,
-        clerkId: users.clerkId,
-        email: users.email,
-        name: users.name,
-        imageUrl: users.imageUrl,
-        role: users.role,
-        bio: users.bio,
-        creatorRoles: users.creatorRoles,
-        genres: users.genres,
-        daw: users.daw,
-        lookingFor: users.lookingFor,
-        socialLinks: users.socialLinks,
-        rating: users.rating,
-        totalRatings: users.totalRatings,
-        createdAt: users.createdAt,
-        updatedAt: users.updatedAt,
-      })
-      .from(users)
-      .where(eq(users.clerkId, clerkId))
-      .limit(1);
+    return await withDbRetry(async () => {
+      // Select specific essential fields to prevent column mismatch failures
+      let [user] = await db
+        .select({
+          id: users.id,
+          clerkId: users.clerkId,
+          email: users.email,
+          name: users.name,
+          imageUrl: users.imageUrl,
+          role: users.role,
+          bio: users.bio,
+          creatorRoles: users.creatorRoles,
+          genres: users.genres,
+          daw: users.daw,
+          lookingFor: users.lookingFor,
+          socialLinks: users.socialLinks,
+          rating: users.rating,
+          totalRatings: users.totalRatings,
+          createdAt: users.createdAt,
+          updatedAt: users.updatedAt,
+        })
+        .from(users)
+        .where(eq(users.clerkId, clerkId!))
+        .limit(1);
 
-    // Auto-provision user record if not created by webhook yet
-    if (!user) {
-      try {
-        let primaryEmail = `${clerkId}@user.clerk`;
-        let fullName = "Creator";
-        let imageUrl: string | null = null;
-
+      // Auto-provision user record if not created by webhook yet
+      if (!user) {
         try {
-          const { currentUser: clerkCurrentUser } = await import("@clerk/nextjs/server");
-          const clerkUser = await clerkCurrentUser();
-          if (clerkUser) {
-            primaryEmail =
-              clerkUser.emailAddresses?.find(
-                (e) => e.id === clerkUser.primaryEmailAddressId
-              )?.emailAddress || clerkUser.emailAddresses?.[0]?.emailAddress || primaryEmail;
+          let primaryEmail = `${clerkId}@user.clerk`;
+          let fullName = "Creator";
+          let imageUrl: string | null = null;
 
-            fullName =
-              clerkUser.firstName || clerkUser.lastName
-                ? `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim()
-                : clerkUser.username || fullName;
+          try {
+            const { currentUser: clerkCurrentUser } = await import("@clerk/nextjs/server");
+            const clerkUser = await clerkCurrentUser();
+            if (clerkUser) {
+              primaryEmail =
+                clerkUser.emailAddresses?.find(
+                  (e) => e.id === clerkUser.primaryEmailAddressId
+                )?.emailAddress || clerkUser.emailAddresses?.[0]?.emailAddress || primaryEmail;
 
-            imageUrl = clerkUser.imageUrl || null;
+              fullName =
+                clerkUser.firstName || clerkUser.lastName
+                  ? `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim()
+                  : clerkUser.username || fullName;
+
+              imageUrl = clerkUser.imageUrl || null;
+            }
+          } catch (clerkErr) {
+            console.error("clerkCurrentUser fetch error:", clerkErr);
           }
-        } catch (clerkErr) {
-          console.error("clerkCurrentUser fetch error:", clerkErr);
-        }
 
-        const [newUser] = await db
-          .insert(users)
-          .values({
-            clerkId,
-            email: primaryEmail,
-            name: fullName,
-            imageUrl,
-            role: "user",
-          })
-          .onConflictDoUpdate({
-            target: users.clerkId,
-            set: { updatedAt: new Date() },
-          })
-          .returning({
-            id: users.id,
-            clerkId: users.clerkId,
-            email: users.email,
-            name: users.name,
-            imageUrl: users.imageUrl,
-            role: users.role,
-          });
-
-        if (newUser) {
-          user = {
-            ...newUser,
-            bio: null,
-            creatorRoles: [],
-            genres: [],
-            daw: null,
-            lookingFor: [],
-            socialLinks: null,
-            rating: 0,
-            totalRatings: 0,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          };
-
-          await db
-            .insert(userCredits)
+          const [newUser] = await db
+            .insert(users)
             .values({
-              userId: newUser.id,
-              balance: 100, // Welcome bonus credits
+              clerkId: clerkId!,
+              email: primaryEmail,
+              name: fullName,
+              imageUrl,
+              role: "user",
             })
-            .onConflictDoNothing();
-        }
-      } catch (e: any) {
-        if (e?.digest === "DYNAMIC_SERVER_USAGE" || e?.message?.includes("DYNAMIC_SERVER_USAGE")) {
-          throw e;
-        }
-        console.error("Auto-provisioning user error:", e);
-      }
-    }
+            .onConflictDoUpdate({
+              target: users.clerkId,
+              set: { updatedAt: new Date() },
+            })
+            .returning({
+              id: users.id,
+              clerkId: users.clerkId,
+              email: users.email,
+              name: users.name,
+              imageUrl: users.imageUrl,
+              role: users.role,
+            });
 
-    return user || fallbackUser;
+          if (newUser) {
+            user = {
+              ...newUser,
+              bio: null,
+              creatorRoles: [],
+              genres: [],
+              daw: null,
+              lookingFor: [],
+              socialLinks: null,
+              rating: 0,
+              totalRatings: 0,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            };
+
+            await db
+              .insert(userCredits)
+              .values({
+                userId: newUser.id,
+                balance: 100, // Welcome bonus credits
+              })
+              .onConflictDoNothing();
+          }
+        } catch (e: any) {
+          if (e?.digest === "DYNAMIC_SERVER_USAGE" || e?.message?.includes("DYNAMIC_SERVER_USAGE")) {
+            throw e;
+          }
+          console.error("Auto-provisioning user error:", e);
+        }
+      }
+
+      return user || fallbackUser;
+    });
   } catch (dbError: any) {
     resetPostgresClient();
     if (dbError?.digest === "DYNAMIC_SERVER_USAGE" || dbError?.message?.includes("DYNAMIC_SERVER_USAGE")) {
@@ -175,54 +177,60 @@ export async function requireUser() {
 
   // Attempt auto-provisioning / lookup in Postgres to get a valid user.id UUID
   try {
-    let [dbUser] = await db
-      .select({
-        id: users.id,
-        clerkId: users.clerkId,
-        email: users.email,
-        name: users.name,
-        imageUrl: users.imageUrl,
-        role: users.role,
-      })
-      .from(users)
-      .where(eq(users.clerkId, user.clerkId))
-      .limit(1);
-
-    if (!dbUser) {
-      const [upserted] = await db
-        .insert(users)
-        .values({
-          clerkId: user.clerkId,
-          email: user.email || `${user.clerkId}@user.clerk`,
-          name: user.name || "Creator",
-          imageUrl: user.imageUrl || null,
-          role: "user",
-        })
-        .onConflictDoUpdate({
-          target: users.clerkId,
-          set: { updatedAt: new Date() },
-        })
-        .returning({
+    const dbUser = await withDbRetry(async () => {
+      let [existing] = await db
+        .select({
           id: users.id,
           clerkId: users.clerkId,
           email: users.email,
           name: users.name,
           imageUrl: users.imageUrl,
           role: users.role,
-        });
+        })
+        .from(users)
+        .where(eq(users.clerkId, user.clerkId))
+        .limit(1);
 
-      dbUser = upserted;
-    }
+      if (!existing) {
+        const [upserted] = await db
+          .insert(users)
+          .values({
+            clerkId: user.clerkId,
+            email: user.email || `${user.clerkId}@user.clerk`,
+            name: user.name || "Creator",
+            imageUrl: user.imageUrl || null,
+            role: "user",
+          })
+          .onConflictDoUpdate({
+            target: users.clerkId,
+            set: { updatedAt: new Date() },
+          })
+          .returning({
+            id: users.id,
+            clerkId: users.clerkId,
+            email: users.email,
+            name: users.name,
+            imageUrl: users.imageUrl,
+            role: users.role,
+          });
+
+        existing = upserted;
+      }
+
+      if (existing && existing.id) {
+        await db
+          .insert(userCredits)
+          .values({
+            userId: existing.id,
+            balance: 100,
+          })
+          .onConflictDoNothing();
+      }
+
+      return existing;
+    });
 
     if (dbUser && dbUser.id) {
-      await db
-        .insert(userCredits)
-        .values({
-          userId: dbUser.id,
-          balance: 100,
-        })
-        .onConflictDoNothing();
-
       return {
         ...user,
         ...dbUser,
@@ -242,5 +250,6 @@ export async function requireUser() {
 
   return user;
 }
+
 
 

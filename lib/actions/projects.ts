@@ -1,7 +1,7 @@
 "use server";
 
 import { requireUser } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { db, withDbRetry } from "@/lib/db";
 import {
   projects,
   projectCollaborators,
@@ -46,20 +46,23 @@ export async function createProject(input: CreateProjectInput) {
     // Ensure we have a valid Postgres user row ID
     let creatorId = user.id;
     if (!creatorId || creatorId === "00000000-0000-0000-0000-000000000000") {
-      const [dbUser] = await db
-        .insert(users)
-        .values({
-          clerkId: user.clerkId,
-          email: user.email || `${user.clerkId}@user.clerk`,
-          name: user.name || "Creator",
-          imageUrl: user.imageUrl || null,
-          role: "user",
-        })
-        .onConflictDoUpdate({
-          target: users.clerkId,
-          set: { updatedAt: new Date() },
-        })
-        .returning({ id: users.id });
+      const dbUser = await withDbRetry(async () => {
+        const [inserted] = await db
+          .insert(users)
+          .values({
+            clerkId: user.clerkId,
+            email: user.email || `${user.clerkId}@user.clerk`,
+            name: user.name || "Creator",
+            imageUrl: user.imageUrl || null,
+            role: "user",
+          })
+          .onConflictDoUpdate({
+            target: users.clerkId,
+            set: { updatedAt: new Date() },
+          })
+          .returning({ id: users.id });
+        return inserted;
+      });
 
       if (dbUser?.id) {
         creatorId = dbUser.id;
@@ -70,22 +73,25 @@ export async function createProject(input: CreateProjectInput) {
       return { success: false, error: "Could not resolve user profile. Please try logging out and signing in again." };
     }
 
-    const [newProject] = await db
-      .insert(projects)
-      .values({
-        title: validated.title,
-        description: validated.description || null,
-        genre: validated.genre || null,
-        bpm: validated.bpm || null,
-        key: validated.key || null,
-        creatorId,
-        visibility: validated.visibility || "public",
-        status: validated.status || "open",
-        neededRoles: validated.neededRoles || [],
-        coverArtKey: validated.coverArtKey || null,
-        defaultCoverIndex: validated.defaultCoverIndex ?? 0,
-      })
-      .returning();
+    const newProject = await withDbRetry(async () => {
+      const [inserted] = await db
+        .insert(projects)
+        .values({
+          title: validated.title,
+          description: validated.description || null,
+          genre: validated.genre || null,
+          bpm: validated.bpm || null,
+          key: validated.key || null,
+          creatorId,
+          visibility: validated.visibility || "public",
+          status: validated.status || "open",
+          neededRoles: validated.neededRoles || [],
+          coverArtKey: validated.coverArtKey || null,
+          defaultCoverIndex: validated.defaultCoverIndex ?? 0,
+        })
+        .returning();
+      return inserted;
+    });
 
     if (!newProject) {
       return { success: false, error: "Failed to create project record in database" };
@@ -93,19 +99,22 @@ export async function createProject(input: CreateProjectInput) {
 
     // Add owner to project_collaborators and project_collaborator_roles
     try {
-      await db.insert(projectCollaborators).values({
-        projectId: newProject.id,
-        userId: creatorId,
-      });
+      await withDbRetry(async () => {
+        await db.insert(projectCollaborators).values({
+          projectId: newProject.id,
+          userId: creatorId,
+        });
 
-      await db.insert(projectCollaboratorRoles).values({
-        projectId: newProject.id,
-        userId: creatorId,
-        role: "owner",
+        await db.insert(projectCollaboratorRoles).values({
+          projectId: newProject.id,
+          userId: creatorId,
+          role: "owner",
+        });
       });
     } catch (collabErr) {
       console.error("Error adding project collaborator record:", collabErr);
     }
+
 
     try {
       revalidatePath("/dashboard");
