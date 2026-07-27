@@ -3,6 +3,8 @@ import { db } from "@/lib/db";
 import { users, userCredits } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
+const FALLBACK_UUID = "00000000-0000-0000-0000-000000000000";
+
 export async function getCurrentUser() {
   let clerkId: string | null = null;
 
@@ -21,9 +23,9 @@ export async function getCurrentUser() {
     return null;
   }
 
-  // Fallback user representation for authenticated clerkId
+  // Safe fallback user representation with a valid UUID format for Postgres queries
   const fallbackUser = {
-    id: clerkId,
+    id: FALLBACK_UUID,
     clerkId,
     email: `${clerkId}@user.clerk`,
     name: "Creator",
@@ -52,16 +54,28 @@ export async function getCurrentUser() {
     // Auto-provision user record if not created by webhook yet
     if (!user) {
       try {
-        const clerkUser = await clerkCurrentUser();
-        const primaryEmail =
-          clerkUser?.emailAddresses?.find(
-            (e) => e.id === clerkUser.primaryEmailAddressId
-          )?.emailAddress || clerkUser?.emailAddresses?.[0]?.emailAddress || `${clerkId}@clerk.user`;
+        let primaryEmail = `${clerkId}@user.clerk`;
+        let fullName = "Creator";
+        let imageUrl: string | null = null;
 
-        const fullName =
-          clerkUser?.firstName || clerkUser?.lastName
-            ? `${clerkUser?.firstName || ""} ${clerkUser?.lastName || ""}`.trim()
-            : clerkUser?.username || "Creator";
+        try {
+          const clerkUser = await clerkCurrentUser();
+          if (clerkUser) {
+            primaryEmail =
+              clerkUser.emailAddresses?.find(
+                (e) => e.id === clerkUser.primaryEmailAddressId
+              )?.emailAddress || clerkUser.emailAddresses?.[0]?.emailAddress || primaryEmail;
+
+            fullName =
+              clerkUser.firstName || clerkUser.lastName
+                ? `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim()
+                : clerkUser.username || fullName;
+
+            imageUrl = clerkUser.imageUrl || null;
+          }
+        } catch (clerkErr) {
+          console.error("clerkCurrentUser fetch error (using fallback defaults):", clerkErr);
+        }
 
         const [newUser] = await db
           .insert(users)
@@ -69,7 +83,7 @@ export async function getCurrentUser() {
             clerkId,
             email: primaryEmail,
             name: fullName,
-            imageUrl: clerkUser?.imageUrl || null,
+            imageUrl,
             role: "user",
           })
           .onConflictDoUpdate({
@@ -103,7 +117,6 @@ export async function getCurrentUser() {
       throw dbError;
     }
     console.error("Database user query error:", dbError);
-    // Always return fallbackUser when clerkId is present so authenticated session UI renders cleanly
     return fallbackUser;
   }
 }
