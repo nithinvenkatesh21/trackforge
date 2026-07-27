@@ -58,7 +58,10 @@ export async function getCurrentUser() {
             })
             .onConflictDoNothing();
         }
-      } catch (e) {
+      } catch (e: any) {
+        if (e?.digest === "DYNAMIC_SERVER_USAGE" || e?.message?.includes("DYNAMIC_SERVER_USAGE")) {
+          throw e;
+        }
         console.error("Auto-provisioning user error:", e);
       }
     }
@@ -84,7 +87,10 @@ export async function getCurrentUser() {
         updatedAt: new Date(),
       }
     );
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.digest === "DYNAMIC_SERVER_USAGE" || error?.message?.includes("DYNAMIC_SERVER_USAGE")) {
+      throw error;
+    }
     console.error("getCurrentUser error:", error);
     return null;
   }
