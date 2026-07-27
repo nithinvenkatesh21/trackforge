@@ -5,9 +5,8 @@ export default function SignUpPage() {
     <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6">
       <div className="w-full max-w-md flex justify-center">
         <SignUp
-          path="/auth/sign-up"
-          routing="path"
           fallbackRedirectUrl="/dashboard"
+          signInUrl="/auth/sign-in"
           appearance={{
             elements: {
               card: "glass-panel border-zinc-800 shadow-2xl",

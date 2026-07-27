@@ -1,4 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
 
 const isPublicRoute = createRouteMatcher([
   "/",
@@ -7,15 +8,25 @@ const isPublicRoute = createRouteMatcher([
   "/api/webhooks/(.*)",
 ]);
 
-export default clerkMiddleware(async (auth, request) => {
+const isAuthRoute = createRouteMatcher(["/auth/(.*)"]);
+
+export default clerkMiddleware(async (authObj, request) => {
+  const { userId } = await authObj();
+
+  // If user is already authenticated and attempts to visit sign-in/sign-up, redirect to dashboard
+  if (userId && isAuthRoute(request)) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  // Protect all non-public routes
   if (!isPublicRoute(request)) {
-    await auth.protect();
+    await authObj.protect();
   }
 });
 
 export const config = {
   matcher: [
-    // Skip Next.js internals and all static files, unless found in search params
+    // Skip Next.js internals and static assets
     "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|json|webmanifest|ttf|woff2?|png|jpg|jpeg|gif|svg|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
     // Always run for API routes
     "/(api|trpc)(.*)",
