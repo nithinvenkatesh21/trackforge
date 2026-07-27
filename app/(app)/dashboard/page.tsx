@@ -1,15 +1,35 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { getMyProjects, getCollaboratingProjects } from "@/lib/queries/projects";
-import { Plus, Music, Users, FolderGit2 } from "lucide-react";
+import { Plus, Music, Users, FolderGit2, LogIn } from "lucide-react";
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
 
-  // If user is not authenticated or not provisioned, redirect to sign-in
+  // If user is not signed in, render sign-in prompt card instead of blank screen
   if (!user) {
-    redirect("/auth/sign-in");
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center">
+        <div className="glass-panel p-10 rounded-2xl text-center space-y-6 max-w-md w-full border border-zinc-800 shadow-2xl">
+          <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 mx-auto flex items-center justify-center">
+            <Music className="w-8 h-8" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-extrabold text-white">Welcome to TrackForge</h2>
+            <p className="text-sm text-zinc-400">
+              Sign in to manage your audio projects, stem revisions, and collaborative sessions.
+            </p>
+          </div>
+          <Link
+            href="/auth/sign-in"
+            className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold text-sm transition flex items-center justify-center space-x-2 shadow-lg shadow-emerald-500/20"
+          >
+            <LogIn className="w-4 h-4" />
+            <span>Sign In to Continue</span>
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   const myProjects = await getMyProjects(user.id);
