@@ -1,18 +1,20 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
 
 const isPublicRoute = createRouteMatcher([
   "/",
-  "/auth/(.*)",
-  "/share/(.*)",
-  "/api/webhooks/(.*)",
+  "/auth(.*)",
+  "/share(.*)",
+  "/api/webhooks(.*)",
 ]);
 
 export default clerkMiddleware(async (authObj, request) => {
-  // Protect all non-public routes and redirect unauthenticated visits to our custom /auth/sign-in page
-  if (!isPublicRoute(request)) {
-    await authObj.protect({
-      unauthenticatedUrl: new URL("/auth/sign-in", request.url).toString(),
-    });
+  const { userId } = await authObj();
+
+  // If user is not logged in and attempts to access a protected route (like /dashboard), redirect directly to /auth/sign-in
+  if (!userId && !isPublicRoute(request)) {
+    const signInUrl = new URL("/auth/sign-in", request.url);
+    return NextResponse.redirect(signInUrl);
   }
 });
 
