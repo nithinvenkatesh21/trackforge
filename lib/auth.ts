@@ -4,13 +4,44 @@ import { users, userCredits } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
 export async function getCurrentUser() {
+  let clerkId: string | null = null;
+
   try {
-    const { userId: clerkId } = await auth();
-
-    if (!clerkId) {
-      return null;
+    const authData = await auth();
+    clerkId = authData.userId;
+  } catch (error: any) {
+    if (error?.digest === "DYNAMIC_SERVER_USAGE" || error?.message?.includes("DYNAMIC_SERVER_USAGE")) {
+      throw error;
     }
+    console.error("auth() retrieval error:", error);
+    return null;
+  }
 
+  if (!clerkId) {
+    return null;
+  }
+
+  // Fallback user representation for authenticated clerkId
+  const fallbackUser = {
+    id: clerkId,
+    clerkId,
+    email: `${clerkId}@user.clerk`,
+    name: "Creator",
+    imageUrl: null,
+    role: "user" as const,
+    bio: null,
+    creatorRoles: [],
+    genres: [],
+    daw: null,
+    lookingFor: [],
+    socialLinks: null,
+    rating: 0,
+    totalRatings: 0,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
+  try {
     // Try finding existing user row in Postgres
     let [user] = await db
       .select()
@@ -66,33 +97,14 @@ export async function getCurrentUser() {
       }
     }
 
-    // Return user or transient user object to prevent infinite redirect loops
-    return (
-      user || {
-        id: clerkId,
-        clerkId,
-        email: `${clerkId}@user.clerk`,
-        name: "Creator",
-        imageUrl: null,
-        role: "user" as const,
-        bio: null,
-        creatorRoles: [],
-        genres: [],
-        daw: null,
-        lookingFor: [],
-        socialLinks: null,
-        rating: 0,
-        totalRatings: 0,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }
-    );
-  } catch (error: any) {
-    if (error?.digest === "DYNAMIC_SERVER_USAGE" || error?.message?.includes("DYNAMIC_SERVER_USAGE")) {
-      throw error;
+    return user || fallbackUser;
+  } catch (dbError: any) {
+    if (dbError?.digest === "DYNAMIC_SERVER_USAGE" || dbError?.message?.includes("DYNAMIC_SERVER_USAGE")) {
+      throw dbError;
     }
-    console.error("getCurrentUser error:", error);
-    return null;
+    console.error("Database user query error:", dbError);
+    // Always return fallbackUser when clerkId is present so authenticated session UI renders cleanly
+    return fallbackUser;
   }
 }
 
