@@ -1,11 +1,16 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { getMyProjects, getCollaboratingProjects } from "@/lib/queries/projects";
 import { Plus, Music, Users, FolderGit2 } from "lucide-react";
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
-  if (!user) return null;
+
+  // If user is not authenticated or not provisioned, redirect to sign-in
+  if (!user) {
+    redirect("/auth/sign-in");
+  }
 
   const myProjects = await getMyProjects(user.id);
   const collabProjects = await getCollaboratingProjects(user.id);
