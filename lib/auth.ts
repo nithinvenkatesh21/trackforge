@@ -44,9 +44,26 @@ export async function getCurrentUser() {
   };
 
   try {
-    // Try finding existing user row in Postgres by clerkId
+    // Select specific essential fields to prevent column mismatch failures
     let [user] = await db
-      .select()
+      .select({
+        id: users.id,
+        clerkId: users.clerkId,
+        email: users.email,
+        name: users.name,
+        imageUrl: users.imageUrl,
+        role: users.role,
+        bio: users.bio,
+        creatorRoles: users.creatorRoles,
+        genres: users.genres,
+        daw: users.daw,
+        lookingFor: users.lookingFor,
+        socialLinks: users.socialLinks,
+        rating: users.rating,
+        totalRatings: users.totalRatings,
+        createdAt: users.createdAt,
+        updatedAt: users.updatedAt,
+      })
       .from(users)
       .where(eq(users.clerkId, clerkId))
       .limit(1);
@@ -87,14 +104,49 @@ export async function getCurrentUser() {
             role: "user",
           })
           .onConflictDoNothing()
-          .returning();
+          .returning({
+            id: users.id,
+            clerkId: users.clerkId,
+            email: users.email,
+            name: users.name,
+            imageUrl: users.imageUrl,
+            role: users.role,
+          });
 
         if (newUser) {
-          user = newUser;
+          user = {
+            ...newUser,
+            bio: null,
+            creatorRoles: [],
+            genres: [],
+            daw: null,
+            lookingFor: [],
+            socialLinks: null,
+            rating: 0,
+            totalRatings: 0,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
         } else {
-          // Retry selection if inserted by concurrent process or on conflict
           [user] = await db
-            .select()
+            .select({
+              id: users.id,
+              clerkId: users.clerkId,
+              email: users.email,
+              name: users.name,
+              imageUrl: users.imageUrl,
+              role: users.role,
+              bio: users.bio,
+              creatorRoles: users.creatorRoles,
+              genres: users.genres,
+              daw: users.daw,
+              lookingFor: users.lookingFor,
+              socialLinks: users.socialLinks,
+              rating: users.rating,
+              totalRatings: users.totalRatings,
+              createdAt: users.createdAt,
+              updatedAt: users.updatedAt,
+            })
             .from(users)
             .where(eq(users.clerkId, clerkId))
             .limit(1);
@@ -141,7 +193,14 @@ export async function requireUser() {
   // Attempt auto-provisioning in Postgres to get a valid user.id UUID
   try {
     let [dbUser] = await db
-      .select()
+      .select({
+        id: users.id,
+        clerkId: users.clerkId,
+        email: users.email,
+        name: users.name,
+        imageUrl: users.imageUrl,
+        role: users.role,
+      })
       .from(users)
       .where(eq(users.clerkId, user.clerkId))
       .limit(1);
@@ -157,13 +216,27 @@ export async function requireUser() {
           role: "user",
         })
         .onConflictDoNothing()
-        .returning();
+        .returning({
+          id: users.id,
+          clerkId: users.clerkId,
+          email: users.email,
+          name: users.name,
+          imageUrl: users.imageUrl,
+          role: users.role,
+        });
 
       dbUser =
         inserted ||
         (
           await db
-            .select()
+            .select({
+              id: users.id,
+              clerkId: users.clerkId,
+              email: users.email,
+              name: users.name,
+              imageUrl: users.imageUrl,
+              role: users.role,
+            })
             .from(users)
             .where(eq(users.clerkId, user.clerkId))
             .limit(1)
@@ -181,7 +254,10 @@ export async function requireUser() {
     }
 
     if (dbUser) {
-      return dbUser;
+      return {
+        ...user,
+        ...dbUser,
+      };
     }
   } catch (err) {
     console.error("requireUser DB provisioning error:", err);

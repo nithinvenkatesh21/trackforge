@@ -47,7 +47,7 @@ export async function createProject(input: CreateProjectInput) {
     let creatorId = user.id;
     if (!creatorId || creatorId === "00000000-0000-0000-0000-000000000000") {
       let [existingUser] = await db
-        .select()
+        .select({ id: users.id, clerkId: users.clerkId })
         .from(users)
         .where(eq(users.clerkId, user.clerkId))
         .limit(1);
@@ -63,13 +63,13 @@ export async function createProject(input: CreateProjectInput) {
             role: "user",
           })
           .onConflictDoNothing()
-          .returning();
+          .returning({ id: users.id, clerkId: users.clerkId });
 
         existingUser =
           newUser ||
           (
             await db
-              .select()
+              .select({ id: users.id, clerkId: users.clerkId })
               .from(users)
               .where(eq(users.clerkId, user.clerkId))
               .limit(1)
