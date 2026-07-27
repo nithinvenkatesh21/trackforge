@@ -8,9 +8,11 @@ const isPublicRoute = createRouteMatcher([
 ]);
 
 export default clerkMiddleware(async (authObj, request) => {
-  // Protect all non-public routes
+  // Protect all non-public routes and redirect unauthenticated visits to our custom /auth/sign-in page
   if (!isPublicRoute(request)) {
-    await authObj.protect();
+    await authObj.protect({
+      unauthenticatedUrl: new URL("/auth/sign-in", request.url).toString(),
+    });
   }
 });
 
