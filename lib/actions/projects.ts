@@ -18,6 +18,26 @@ import {
 import { eq, and, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
+function serializeProject(p: any) {
+  if (!p) return null;
+  return {
+    id: String(p.id),
+    title: String(p.title || ""),
+    description: p.description ? String(p.description) : null,
+    genre: p.genre ? String(p.genre) : null,
+    bpm: p.bpm ? Number(p.bpm) : null,
+    key: p.key ? String(p.key) : null,
+    creatorId: String(p.creatorId || ""),
+    visibility: String(p.visibility || "public"),
+    status: String(p.status || "open"),
+    neededRoles: Array.isArray(p.neededRoles) ? p.neededRoles : [],
+    coverArtKey: p.coverArtKey ? String(p.coverArtKey) : null,
+    defaultCoverIndex: p.defaultCoverIndex ? Number(p.defaultCoverIndex) : 0,
+    createdAt: p.createdAt ? new Date(p.createdAt).toISOString() : new Date().toISOString(),
+    updatedAt: p.updatedAt ? new Date(p.updatedAt).toISOString() : new Date().toISOString(),
+  };
+}
+
 export async function createProject(input: CreateProjectInput) {
   try {
     const user = await requireUser();
@@ -100,7 +120,11 @@ export async function createProject(input: CreateProjectInput) {
 
     revalidatePath("/dashboard");
     revalidatePath("/explore");
-    return { success: true, project: newProject };
+
+    return {
+      success: true,
+      project: serializeProject(newProject),
+    };
   } catch (error: any) {
     console.error("createProject server action error:", error);
     return { success: false, error: error?.message || "Failed to create project" };
@@ -168,7 +192,7 @@ export async function updateProject(
 
     revalidatePath(`/projects/${projectId}`);
     revalidatePath("/dashboard");
-    return { success: true, project: updated };
+    return { success: true, project: serializeProject(updated) };
   } catch (error: any) {
     console.error("updateProject server action error:", error);
     return { success: false, error: error?.message || "Failed to update project" };

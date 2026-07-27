@@ -9,45 +9,54 @@ import { eq, and, sql, desc } from "drizzle-orm";
 import { getDownloadUrl } from "@/lib/storage";
 
 export async function getProjectById(projectId: string) {
-  const [project] = await db
-    .select({
-      id: projects.id,
-      title: projects.title,
-      description: projects.description,
-      genre: projects.genre,
-      bpm: projects.bpm,
-      key: projects.key,
-      creatorId: projects.creatorId,
-      visibility: projects.visibility,
-      status: projects.status,
-      neededRoles: projects.neededRoles,
-      coverArtKey: projects.coverArtKey,
-      defaultCoverIndex: projects.defaultCoverIndex,
-      createdAt: projects.createdAt,
-      updatedAt: projects.updatedAt,
-      creator: {
-        id: users.id,
-        name: users.name,
-        imageUrl: users.imageUrl,
-        creatorRoles: users.creatorRoles,
-      },
-    })
-    .from(projects)
-    .innerJoin(users, eq(projects.creatorId, users.id))
-    .where(eq(projects.id, projectId))
-    .limit(1);
+  if (!isUuid(projectId)) return null;
 
-  if (!project) return null;
+  try {
+    const [project] = await db
+      .select({
+        id: projects.id,
+        title: projects.title,
+        description: projects.description,
+        genre: projects.genre,
+        bpm: projects.bpm,
+        key: projects.key,
+        creatorId: projects.creatorId,
+        visibility: projects.visibility,
+        status: projects.status,
+        neededRoles: projects.neededRoles,
+        coverArtKey: projects.coverArtKey,
+        defaultCoverIndex: projects.defaultCoverIndex,
+        createdAt: projects.createdAt,
+        updatedAt: projects.updatedAt,
+        creator: {
+          id: users.id,
+          name: users.name,
+          imageUrl: users.imageUrl,
+          creatorRoles: users.creatorRoles,
+        },
+      })
+      .from(projects)
+      .innerJoin(users, eq(projects.creatorId, users.id))
+      .where(eq(projects.id, projectId))
+      .limit(1);
 
-  const coverUrl = project.coverArtKey
-    ? await getDownloadUrl(project.coverArtKey)
-    : null;
+    if (!project) return null;
 
-  return {
-    ...project,
-    coverUrl,
-  };
+    const coverUrl = project.coverArtKey
+      ? await getDownloadUrl(project.coverArtKey)
+      : null;
+
+    return {
+      ...project,
+      coverUrl,
+    };
+  } catch (err) {
+    console.error("getProjectById query error:", err);
+    return null;
+  }
 }
+
+
 
 const isUuid = (id: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) &&
