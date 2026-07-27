@@ -126,5 +126,54 @@ export async function requireUser() {
   if (!user) {
     throw new Error("Not authenticated");
   }
+
+  // If user is already a persisted row in Postgres, return it immediately
+  if (user.id && user.id !== FALLBACK_UUID) {
+    return user;
+  }
+
+  // If user was using fallback User object, attempt auto-provisioning in Postgres
+  try {
+    let [dbUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.clerkId, user.clerkId))
+      .limit(1);
+
+    if (!dbUser) {
+      const [inserted] = await db
+        .insert(users)
+        .values({
+          clerkId: user.clerkId,
+          email: user.email,
+          name: user.name || "Creator",
+          imageUrl: user.imageUrl,
+          role: "user",
+        })
+        .onConflictDoUpdate({
+          target: users.clerkId,
+          set: { updatedAt: new Date() },
+        })
+        .returning();
+
+      if (inserted) {
+        dbUser = inserted;
+        await db
+          .insert(userCredits)
+          .values({
+            userId: inserted.id,
+            balance: 100,
+          })
+          .onConflictDoNothing();
+      }
+    }
+
+    if (dbUser) {
+      return dbUser;
+    }
+  } catch (err) {
+    console.error("requireUser DB provisioning error:", err);
+  }
+
   return user;
 }
