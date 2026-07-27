@@ -20,43 +20,70 @@ export async function getCurrentUser() {
 
     // Auto-provision user record if not created by webhook yet
     if (!user) {
-      const clerkUser = await clerkCurrentUser();
-      const primaryEmail =
-        clerkUser?.emailAddresses?.find(
-          (e) => e.id === clerkUser.primaryEmailAddressId
-        )?.emailAddress || clerkUser?.emailAddresses?.[0]?.emailAddress || `${clerkId}@clerk.user`;
+      try {
+        const clerkUser = await clerkCurrentUser();
+        const primaryEmail =
+          clerkUser?.emailAddresses?.find(
+            (e) => e.id === clerkUser.primaryEmailAddressId
+          )?.emailAddress || clerkUser?.emailAddresses?.[0]?.emailAddress || `${clerkId}@clerk.user`;
 
-      const fullName =
-        clerkUser?.firstName || clerkUser?.lastName
-          ? `${clerkUser?.firstName || ""} ${clerkUser?.lastName || ""}`.trim()
-          : clerkUser?.username || "Creator";
+        const fullName =
+          clerkUser?.firstName || clerkUser?.lastName
+            ? `${clerkUser?.firstName || ""} ${clerkUser?.lastName || ""}`.trim()
+            : clerkUser?.username || "Creator";
 
-      [user] = await db
-        .insert(users)
-        .values({
-          clerkId,
-          email: primaryEmail,
-          name: fullName,
-          imageUrl: clerkUser?.imageUrl || null,
-          role: "user",
-        })
-        .onConflictDoUpdate({
-          target: users.clerkId,
-          set: { updatedAt: new Date() },
-        })
-        .returning();
+        const [newUser] = await db
+          .insert(users)
+          .values({
+            clerkId,
+            email: primaryEmail,
+            name: fullName,
+            imageUrl: clerkUser?.imageUrl || null,
+            role: "user",
+          })
+          .onConflictDoUpdate({
+            target: users.clerkId,
+            set: { updatedAt: new Date() },
+          })
+          .returning();
 
-      // Initialize default user credits
-      await db
-        .insert(userCredits)
-        .values({
-          userId: user.id,
-          balance: 100, // Welcome bonus credits
-        })
-        .onConflictDoNothing();
+        user = newUser;
+
+        if (user) {
+          await db
+            .insert(userCredits)
+            .values({
+              userId: user.id,
+              balance: 100, // Welcome bonus credits
+            })
+            .onConflictDoNothing();
+        }
+      } catch (e) {
+        console.error("Auto-provisioning user error:", e);
+      }
     }
 
-    return user || null;
+    // Return user or transient user object to prevent infinite redirect loops
+    return (
+      user || {
+        id: clerkId,
+        clerkId,
+        email: `${clerkId}@user.clerk`,
+        name: "Creator",
+        imageUrl: null,
+        role: "user" as const,
+        bio: null,
+        creatorRoles: [],
+        genres: [],
+        daw: null,
+        lookingFor: [],
+        socialLinks: null,
+        rating: 0,
+        totalRatings: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+    );
   } catch (error) {
     console.error("getCurrentUser error:", error);
     return null;
