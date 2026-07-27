@@ -25,12 +25,13 @@ const client =
   globalThis._postgresClient ||
   postgres(connectionString, {
     prepare: false,
+    max: process.env.NODE_ENV === "production" ? 1 : 10,
+    idle_timeout: 20,
+    connect_timeout: 10,
     ssl: isRemote ? { rejectUnauthorized: false } : false,
   });
 
-if (process.env.NODE_ENV !== "production") {
-  globalThis._postgresClient = client;
-}
+globalThis._postgresClient = client;
 
 export const db = drizzle(client, { schema });
 

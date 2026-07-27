@@ -168,52 +168,71 @@ export async function requireUser() {
     return user;
   }
 
-  // Attempt atomic auto-provisioning in Postgres to get a valid user.id UUID
+  // Attempt auto-provisioning / lookup in Postgres to get a valid user.id UUID
   try {
-    const [upserted] = await db
-      .insert(users)
-      .values({
-        clerkId: user.clerkId,
-        email: user.email || `${user.clerkId}@user.clerk`,
-        name: user.name || "Creator",
-        imageUrl: user.imageUrl || null,
-        role: "user",
-      })
-      .onConflictDoUpdate({
-        target: users.clerkId,
-        set: { updatedAt: new Date() },
-      })
-      .returning({
+    let [dbUser] = await db
+      .select({
         id: users.id,
         clerkId: users.clerkId,
         email: users.email,
         name: users.name,
         imageUrl: users.imageUrl,
         role: users.role,
-      });
+      })
+      .from(users)
+      .where(eq(users.clerkId, user.clerkId))
+      .limit(1);
 
-    if (upserted && upserted.id) {
+    if (!dbUser) {
+      const [upserted] = await db
+        .insert(users)
+        .values({
+          clerkId: user.clerkId,
+          email: user.email || `${user.clerkId}@user.clerk`,
+          name: user.name || "Creator",
+          imageUrl: user.imageUrl || null,
+          role: "user",
+        })
+        .onConflictDoUpdate({
+          target: users.clerkId,
+          set: { updatedAt: new Date() },
+        })
+        .returning({
+          id: users.id,
+          clerkId: users.clerkId,
+          email: users.email,
+          name: users.name,
+          imageUrl: users.imageUrl,
+          role: users.role,
+        });
+
+      dbUser = upserted;
+    }
+
+    if (dbUser && dbUser.id) {
       await db
         .insert(userCredits)
         .values({
-          userId: upserted.id,
+          userId: dbUser.id,
           balance: 100,
         })
         .onConflictDoNothing();
 
       return {
         ...user,
-        ...upserted,
+        ...dbUser,
       };
     }
-  } catch (err) {
+  } catch (err: any) {
     console.error("requireUser DB provisioning error:", err);
+    throw new Error(`Database user sync error: ${err?.message || err}`);
   }
 
   if (!user.id || user.id === FALLBACK_UUID) {
-    throw new Error("Unable to sync user account with database. Please try again.");
+    throw new Error("Unable to sync user account with database. Please try logging out and back in.");
   }
 
   return user;
 }
+
 
