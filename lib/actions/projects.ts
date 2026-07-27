@@ -7,6 +7,7 @@ import {
   projectCollaborators,
   projectCollaboratorRoles,
   notifications,
+  users,
 } from "@/lib/db/schema";
 import {
   createProjectSchema,
@@ -22,6 +23,44 @@ export async function createProject(input: CreateProjectInput) {
     const user = await requireUser();
     const validated = createProjectSchema.parse(input);
 
+    // Ensure we have a valid Postgres user row ID
+    let creatorId = user.id;
+    if (!creatorId || creatorId === "00000000-0000-0000-0000-000000000000") {
+      let [existingUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.clerkId, user.clerkId))
+        .limit(1);
+
+      if (!existingUser) {
+        const [newUser] = await db
+          .insert(users)
+          .values({
+            clerkId: user.clerkId,
+            email: user.email || `${user.clerkId}@user.clerk`,
+            name: user.name || "Creator",
+            imageUrl: user.imageUrl || null,
+            role: "user",
+          })
+          .onConflictDoNothing()
+          .returning();
+
+        existingUser =
+          newUser ||
+          (
+            await db
+              .select()
+              .from(users)
+              .where(eq(users.clerkId, user.clerkId))
+              .limit(1)
+          )[0];
+      }
+
+      if (existingUser) {
+        creatorId = existingUser.id;
+      }
+    }
+
     const [newProject] = await db
       .insert(projects)
       .values({
@@ -30,7 +69,7 @@ export async function createProject(input: CreateProjectInput) {
         genre: validated.genre || null,
         bpm: validated.bpm || null,
         key: validated.key || null,
-        creatorId: user.id,
+        creatorId,
         visibility: validated.visibility || "public",
         status: validated.status || "open",
         neededRoles: validated.neededRoles || [],
@@ -40,19 +79,19 @@ export async function createProject(input: CreateProjectInput) {
       .returning();
 
     if (!newProject) {
-      throw new Error("Failed to create project record");
+      return { success: false, error: "Failed to create project record in database" };
     }
 
     // Add owner to project_collaborators and project_collaborator_roles
     try {
       await db.insert(projectCollaborators).values({
         projectId: newProject.id,
-        userId: user.id,
+        userId: creatorId,
       });
 
       await db.insert(projectCollaboratorRoles).values({
         projectId: newProject.id,
-        userId: user.id,
+        userId: creatorId,
         role: "owner",
       });
     } catch (collabErr) {
@@ -61,10 +100,10 @@ export async function createProject(input: CreateProjectInput) {
 
     revalidatePath("/dashboard");
     revalidatePath("/explore");
-    return newProject;
+    return { success: true, project: newProject };
   } catch (error: any) {
     console.error("createProject server action error:", error);
-    throw new Error(error?.message || "Failed to create project");
+    return { success: false, error: error?.message || "Failed to create project" };
   }
 }
 
@@ -89,7 +128,7 @@ export async function updateProject(
       .limit(1);
 
     if (!roleRow || (roleRow.role !== "owner" && roleRow.role !== "producer")) {
-      throw new Error("Forbidden: Only project owners and producers can update settings");
+      return { success: false, error: "Forbidden: Only project owners and producers can update settings" };
     }
 
     const [updated] = await db
@@ -129,10 +168,10 @@ export async function updateProject(
 
     revalidatePath(`/projects/${projectId}`);
     revalidatePath("/dashboard");
-    return updated;
+    return { success: true, project: updated };
   } catch (error: any) {
     console.error("updateProject server action error:", error);
-    throw new Error(error?.message || "Failed to update project");
+    return { success: false, error: error?.message || "Failed to update project" };
   }
 }
 
@@ -147,11 +186,11 @@ export async function deleteProject(projectId: string) {
       .limit(1);
 
     if (!project) {
-      throw new Error("Project not found");
+      return { success: false, error: "Project not found" };
     }
 
     if (project.creatorId !== user.id) {
-      throw new Error("Forbidden: Only project owner can delete project");
+      return { success: false, error: "Forbidden: Only project owner can delete project" };
     }
 
     // Single DELETE statement — ON DELETE CASCADE handles all child rows
@@ -162,6 +201,6 @@ export async function deleteProject(projectId: string) {
     return { success: true };
   } catch (error: any) {
     console.error("deleteProject server action error:", error);
-    throw new Error(error?.message || "Failed to delete project");
+    return { success: false, error: error?.message || "Failed to delete project" };
   }
 }

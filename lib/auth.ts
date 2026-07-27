@@ -23,7 +23,7 @@ export async function getCurrentUser() {
     return null;
   }
 
-  // Safe fallback user representation with a valid UUID format for Postgres queries
+  // Safe fallback user representation
   const fallbackUser = {
     id: FALLBACK_UUID,
     clerkId,
@@ -44,7 +44,7 @@ export async function getCurrentUser() {
   };
 
   try {
-    // Try finding existing user row in Postgres
+    // Try finding existing user row in Postgres by clerkId
     let [user] = await db
       .select()
       .from(users)
@@ -74,7 +74,7 @@ export async function getCurrentUser() {
             imageUrl = clerkUser.imageUrl || null;
           }
         } catch (clerkErr) {
-          console.error("clerkCurrentUser fetch error (using fallback defaults):", clerkErr);
+          console.error("clerkCurrentUser fetch error:", clerkErr);
         }
 
         const [newUser] = await db
@@ -86,13 +86,19 @@ export async function getCurrentUser() {
             imageUrl,
             role: "user",
           })
-          .onConflictDoUpdate({
-            target: users.clerkId,
-            set: { updatedAt: new Date() },
-          })
+          .onConflictDoNothing()
           .returning();
 
-        user = newUser;
+        if (newUser) {
+          user = newUser;
+        } else {
+          // Retry selection if inserted by concurrent process or on conflict
+          [user] = await db
+            .select()
+            .from(users)
+            .where(eq(users.clerkId, clerkId))
+            .limit(1);
+        }
 
         if (user) {
           await db
@@ -132,7 +138,7 @@ export async function requireUser() {
     return user;
   }
 
-  // If user was using fallback User object, attempt auto-provisioning in Postgres
+  // Attempt auto-provisioning in Postgres to get a valid user.id UUID
   try {
     let [dbUser] = await db
       .select()
@@ -150,18 +156,24 @@ export async function requireUser() {
           imageUrl: user.imageUrl,
           role: "user",
         })
-        .onConflictDoUpdate({
-          target: users.clerkId,
-          set: { updatedAt: new Date() },
-        })
+        .onConflictDoNothing()
         .returning();
 
-      if (inserted) {
-        dbUser = inserted;
+      dbUser =
+        inserted ||
+        (
+          await db
+            .select()
+            .from(users)
+            .where(eq(users.clerkId, user.clerkId))
+            .limit(1)
+        )[0];
+
+      if (dbUser) {
         await db
           .insert(userCredits)
           .values({
-            userId: inserted.id,
+            userId: dbUser.id,
             balance: 100,
           })
           .onConflictDoNothing();

@@ -25,7 +25,7 @@ export default function NewProjectPage() {
 
     setIsSubmitting(true);
     try {
-      const project = await createProject({
+      const res = await createProject({
         title: formData.title.trim(),
         description: formData.description.trim() || undefined,
         genre: formData.genre.trim() || undefined,
@@ -35,10 +35,14 @@ export default function NewProjectPage() {
         neededRoles: formData.neededRoles,
       });
 
-      toast.success("Project created successfully!");
-      router.push(`/projects/${project.id}`);
+      if (res.success && res.project) {
+        toast.success("Project created successfully!");
+        router.push(`/projects/${res.project.id}`);
+      } else {
+        toast.error(res.error || "Failed to create project");
+      }
     } catch (err: any) {
-      toast.error(err.message || "Failed to create project");
+      toast.error(err?.message || "Failed to create project");
     } finally {
       setIsSubmitting(false);
     }
