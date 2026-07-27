@@ -156,7 +156,8 @@ export async function getCurrentUser() {
     if (dbError?.digest === "DYNAMIC_SERVER_USAGE" || dbError?.message?.includes("DYNAMIC_SERVER_USAGE")) {
       throw dbError;
     }
-    console.error("Database user query error:", dbError);
+    const causeMsg = dbError?.cause?.message || dbError?.cause?.detail || dbError?.cause || "";
+    console.error("Database user query error:", dbError, causeMsg);
     return fallbackUser;
   }
 }
@@ -229,8 +230,10 @@ export async function requireUser() {
     }
   } catch (err: any) {
     resetPostgresClient();
-    console.error("requireUser DB provisioning error:", err);
-    throw new Error(`Database user sync error: ${err?.message || err}`);
+    console.error("requireUser DB provisioning error:", err, err?.cause);
+    const causeText = err?.cause?.message || err?.cause?.detail || (typeof err?.cause === "string" ? err.cause : "");
+    const fullMsg = causeText ? `${err?.message} [Cause: ${causeText}]` : (err?.message || String(err));
+    throw new Error(`Database user sync error: ${fullMsg}`);
   }
 
   if (!user.id || user.id === FALLBACK_UUID) {
