@@ -3,7 +3,7 @@ import postgres from "postgres";
 import * as schema from "./schema";
 
 const DEFAULT_SUPABASE_URL =
-  "postgresql://postgres:lloydVenk123%21Nv20890%21@db.pglskfzycplkfrmaglgy.supabase.co:6543/postgres";
+  "postgresql://postgres.pglskfzycplkfrmaglgy:lloydVenk123%21Nv20890%21@aws-0-us-east-2.pooler.supabase.com:6543/postgres";
 
 let rawConnectionString =
   process.env.DATABASE_URL ||
@@ -11,16 +11,26 @@ let rawConnectionString =
   process.env.SUPABASE_DATABASE_URL ||
   DEFAULT_SUPABASE_URL;
 
-// Ensure Supabase connection uses IPv4-compatible transaction pooler port 6543 on Vercel
+// Ensure Supabase connections use IPv4-compatible transaction pooler host on Vercel / serverless
 try {
   const url = new URL(rawConnectionString);
-  if (url.hostname.includes("supabase.co") && (!url.port || url.port === "5432")) {
+  if (url.hostname.startsWith("db.") && url.hostname.endsWith(".supabase.co")) {
+    const projectRef = url.hostname.split(".")[1];
+    if (projectRef) {
+      url.hostname = "aws-0-us-east-2.pooler.supabase.com";
+      url.port = "6543";
+      if (!url.username.includes(".")) {
+        url.username = `${url.username}.${projectRef}`;
+      }
+      rawConnectionString = url.toString();
+    }
+  } else if (url.hostname.includes("supabase.co") && (!url.port || url.port === "5432")) {
     url.port = "6543";
     rawConnectionString = url.toString();
   }
 } catch (e) {
-  if (rawConnectionString.includes("supabase.co:5432")) {
-    rawConnectionString = rawConnectionString.replace(":5432", ":6543");
+  if (rawConnectionString.includes("db.pglskfzycplkfrmaglgy.supabase.co")) {
+    rawConnectionString = "postgresql://postgres.pglskfzycplkfrmaglgy:lloydVenk123%21Nv20890%21@aws-0-us-east-2.pooler.supabase.com:6543/postgres";
   }
 }
 
