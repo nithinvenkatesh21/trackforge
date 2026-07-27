@@ -103,7 +103,10 @@ export async function getCurrentUser() {
             imageUrl,
             role: "user",
           })
-          .onConflictDoNothing()
+          .onConflictDoUpdate({
+            target: users.clerkId,
+            set: { updatedAt: new Date() },
+          })
           .returning({
             id: users.id,
             clerkId: users.clerkId,
@@ -127,36 +130,11 @@ export async function getCurrentUser() {
             createdAt: new Date(),
             updatedAt: new Date(),
           };
-        } else {
-          [user] = await db
-            .select({
-              id: users.id,
-              clerkId: users.clerkId,
-              email: users.email,
-              name: users.name,
-              imageUrl: users.imageUrl,
-              role: users.role,
-              bio: users.bio,
-              creatorRoles: users.creatorRoles,
-              genres: users.genres,
-              daw: users.daw,
-              lookingFor: users.lookingFor,
-              socialLinks: users.socialLinks,
-              rating: users.rating,
-              totalRatings: users.totalRatings,
-              createdAt: users.createdAt,
-              updatedAt: users.updatedAt,
-            })
-            .from(users)
-            .where(eq(users.clerkId, clerkId))
-            .limit(1);
-        }
 
-        if (user) {
           await db
             .insert(userCredits)
             .values({
-              userId: user.id,
+              userId: newUser.id,
               balance: 100, // Welcome bonus credits
             })
             .onConflictDoNothing();
@@ -190,78 +168,52 @@ export async function requireUser() {
     return user;
   }
 
-  // Attempt auto-provisioning in Postgres to get a valid user.id UUID
+  // Attempt atomic auto-provisioning in Postgres to get a valid user.id UUID
   try {
-    let [dbUser] = await db
-      .select({
+    const [upserted] = await db
+      .insert(users)
+      .values({
+        clerkId: user.clerkId,
+        email: user.email || `${user.clerkId}@user.clerk`,
+        name: user.name || "Creator",
+        imageUrl: user.imageUrl || null,
+        role: "user",
+      })
+      .onConflictDoUpdate({
+        target: users.clerkId,
+        set: { updatedAt: new Date() },
+      })
+      .returning({
         id: users.id,
         clerkId: users.clerkId,
         email: users.email,
         name: users.name,
         imageUrl: users.imageUrl,
         role: users.role,
-      })
-      .from(users)
-      .where(eq(users.clerkId, user.clerkId))
-      .limit(1);
+      });
 
-    if (!dbUser) {
-      const [inserted] = await db
-        .insert(users)
+    if (upserted && upserted.id) {
+      await db
+        .insert(userCredits)
         .values({
-          clerkId: user.clerkId,
-          email: user.email,
-          name: user.name || "Creator",
-          imageUrl: user.imageUrl,
-          role: "user",
+          userId: upserted.id,
+          balance: 100,
         })
-        .onConflictDoNothing()
-        .returning({
-          id: users.id,
-          clerkId: users.clerkId,
-          email: users.email,
-          name: users.name,
-          imageUrl: users.imageUrl,
-          role: users.role,
-        });
+        .onConflictDoNothing();
 
-      dbUser =
-        inserted ||
-        (
-          await db
-            .select({
-              id: users.id,
-              clerkId: users.clerkId,
-              email: users.email,
-              name: users.name,
-              imageUrl: users.imageUrl,
-              role: users.role,
-            })
-            .from(users)
-            .where(eq(users.clerkId, user.clerkId))
-            .limit(1)
-        )[0];
-
-      if (dbUser) {
-        await db
-          .insert(userCredits)
-          .values({
-            userId: dbUser.id,
-            balance: 100,
-          })
-          .onConflictDoNothing();
-      }
-    }
-
-    if (dbUser) {
       return {
         ...user,
-        ...dbUser,
+        ...upserted,
       };
     }
   } catch (err) {
     console.error("requireUser DB provisioning error:", err);
   }
 
+  if (!user.id || user.id === FALLBACK_UUID) {
+    throw new Error("Unable to sync user account with database. Please try again.");
+  }
+
   return user;
 }
+

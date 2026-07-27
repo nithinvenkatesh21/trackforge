@@ -46,39 +46,28 @@ export async function createProject(input: CreateProjectInput) {
     // Ensure we have a valid Postgres user row ID
     let creatorId = user.id;
     if (!creatorId || creatorId === "00000000-0000-0000-0000-000000000000") {
-      let [existingUser] = await db
-        .select({ id: users.id, clerkId: users.clerkId })
-        .from(users)
-        .where(eq(users.clerkId, user.clerkId))
-        .limit(1);
+      const [dbUser] = await db
+        .insert(users)
+        .values({
+          clerkId: user.clerkId,
+          email: user.email || `${user.clerkId}@user.clerk`,
+          name: user.name || "Creator",
+          imageUrl: user.imageUrl || null,
+          role: "user",
+        })
+        .onConflictDoUpdate({
+          target: users.clerkId,
+          set: { updatedAt: new Date() },
+        })
+        .returning({ id: users.id });
 
-      if (!existingUser) {
-        const [newUser] = await db
-          .insert(users)
-          .values({
-            clerkId: user.clerkId,
-            email: user.email || `${user.clerkId}@user.clerk`,
-            name: user.name || "Creator",
-            imageUrl: user.imageUrl || null,
-            role: "user",
-          })
-          .onConflictDoNothing()
-          .returning({ id: users.id, clerkId: users.clerkId });
-
-        existingUser =
-          newUser ||
-          (
-            await db
-              .select({ id: users.id, clerkId: users.clerkId })
-              .from(users)
-              .where(eq(users.clerkId, user.clerkId))
-              .limit(1)
-          )[0];
+      if (dbUser?.id) {
+        creatorId = dbUser.id;
       }
+    }
 
-      if (existingUser) {
-        creatorId = existingUser.id;
-      }
+    if (!creatorId || creatorId === "00000000-0000-0000-0000-000000000000") {
+      return { success: false, error: "Could not resolve user profile. Please try logging out and signing in again." };
     }
 
     const [newProject] = await db

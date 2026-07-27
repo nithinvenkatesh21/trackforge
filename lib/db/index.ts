@@ -17,9 +17,20 @@ const isRemote =
   connectionString.includes("neon.tech") ||
   process.env.NODE_ENV === "production";
 
-const client = postgres(connectionString, {
-  prepare: false,
-  ssl: isRemote ? { rejectUnauthorized: false } : false,
-});
+declare global {
+  var _postgresClient: ReturnType<typeof postgres> | undefined;
+}
+
+const client =
+  globalThis._postgresClient ||
+  postgres(connectionString, {
+    prepare: false,
+    ssl: isRemote ? { rejectUnauthorized: false } : false,
+  });
+
+if (process.env.NODE_ENV !== "production") {
+  globalThis._postgresClient = client;
+}
 
 export const db = drizzle(client, { schema });
+
