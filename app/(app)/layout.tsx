@@ -5,7 +5,7 @@ import { getBalance } from "@/lib/queries/credits";
 import { LogoDropdown } from "@/components/project/LogoDropdown";
 import { NotificationsDropdown } from "@/components/project/NotificationsDropdown";
 import { UserButton } from "@clerk/nextjs";
-import { LayoutDashboard, Compass, ShoppingBag, Briefcase, GitPullRequest, Coins, User } from "lucide-react";
+import { LayoutDashboard, Compass, ShoppingBag, Briefcase, GitPullRequest, Coins } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -15,9 +15,29 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const user = await getCurrentUser();
-  const userNotifications = user ? await getNotifications(user.id, 20) : [];
-  const creditRow = user ? await getBalance(user.id) : { balance: 0 };
+  let user = null;
+  let userNotifications: any[] = [];
+  let creditRow = { balance: 100 };
+
+  try {
+    user = await getCurrentUser();
+  } catch (err) {
+    console.error("AppLayout getCurrentUser error:", err);
+  }
+
+  if (user) {
+    try {
+      userNotifications = await getNotifications(user.id, 20);
+    } catch (err) {
+      console.error("AppLayout getNotifications error:", err);
+    }
+
+    try {
+      creditRow = await getBalance(user.id);
+    } catch (err) {
+      console.error("AppLayout getBalance error:", err);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white flex flex-col selection:bg-emerald-500 selection:text-zinc-950">

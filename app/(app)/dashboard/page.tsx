@@ -3,8 +3,16 @@ import { getCurrentUser } from "@/lib/auth";
 import { getMyProjects, getCollaboratingProjects } from "@/lib/queries/projects";
 import { Plus, Music, Users, FolderGit2, LogIn } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function DashboardPage() {
-  const user = await getCurrentUser();
+  let user = null;
+  try {
+    user = await getCurrentUser();
+  } catch (err) {
+    console.error("DashboardPage getCurrentUser error:", err);
+  }
 
   // If user is not signed in, render sign-in prompt card instead of blank screen
   if (!user) {
@@ -32,8 +40,20 @@ export default async function DashboardPage() {
     );
   }
 
-  const myProjects = await getMyProjects(user.id);
-  const collabProjects = await getCollaboratingProjects(user.id);
+  let myProjects: any[] = [];
+  let collabProjects: any[] = [];
+
+  try {
+    myProjects = await getMyProjects(user.id);
+  } catch (err) {
+    console.error("DashboardPage getMyProjects error:", err);
+  }
+
+  try {
+    collabProjects = await getCollaboratingProjects(user.id);
+  } catch (err) {
+    console.error("DashboardPage getCollaboratingProjects error:", err);
+  }
 
   return (
     <div className="space-y-8">
