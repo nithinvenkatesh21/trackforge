@@ -107,8 +107,12 @@ export async function createProject(input: CreateProjectInput) {
       console.error("Error adding project collaborator record:", collabErr);
     }
 
-    revalidatePath("/dashboard");
-    revalidatePath("/explore");
+    try {
+      revalidatePath("/dashboard");
+      revalidatePath("/explore");
+    } catch (revalErr) {
+      console.warn("revalidatePath warning:", revalErr);
+    }
 
     return {
       success: true,
@@ -179,8 +183,13 @@ export async function updateProject(
       console.error("Error creating project update notification:", notifErr);
     }
 
-    revalidatePath(`/projects/${projectId}`);
-    revalidatePath("/dashboard");
+    try {
+      revalidatePath(`/projects/${projectId}`);
+      revalidatePath("/dashboard");
+    } catch (revalErr) {
+      console.warn("revalidatePath warning:", revalErr);
+    }
+
     return { success: true, project: serializeProject(updated) };
   } catch (error: any) {
     console.error("updateProject server action error:", error);
@@ -209,8 +218,13 @@ export async function deleteProject(projectId: string) {
     // Single DELETE statement — ON DELETE CASCADE handles all child rows
     await db.delete(projects).where(eq(projects.id, projectId));
 
-    revalidatePath("/dashboard");
-    revalidatePath("/explore");
+    try {
+      revalidatePath("/dashboard");
+      revalidatePath("/explore");
+    } catch (revalErr) {
+      console.warn("revalidatePath warning:", revalErr);
+    }
+
     return { success: true };
   } catch (error: any) {
     console.error("deleteProject server action error:", error);

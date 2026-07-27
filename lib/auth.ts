@@ -6,17 +6,19 @@ import { eq } from "drizzle-orm";
 const FALLBACK_UUID = "00000000-0000-0000-0000-000000000000";
 
 export async function getCurrentUser() {
-  let clerkId: string | null = null;
+  let clerkId: string | null = process.env.TEST_USER_CLERK_ID || null;
 
-  try {
-    const authData = await auth();
-    clerkId = authData.userId;
-  } catch (error: any) {
-    if (error?.digest === "DYNAMIC_SERVER_USAGE" || error?.message?.includes("DYNAMIC_SERVER_USAGE")) {
-      throw error;
+  if (!clerkId) {
+    try {
+      const authData = await auth();
+      clerkId = authData.userId;
+    } catch (error: any) {
+      if (error?.digest === "DYNAMIC_SERVER_USAGE" || error?.message?.includes("DYNAMIC_SERVER_USAGE")) {
+        throw error;
+      }
+      console.error("auth() retrieval error:", error);
+      return null;
     }
-    console.error("auth() retrieval error:", error);
-    return null;
   }
 
   if (!clerkId) {
